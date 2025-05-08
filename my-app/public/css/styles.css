@@ -1,0 +1,152 @@
+html,
+body {
+  height: 100%;
+}
+
+#app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.content-wrap {
+  flex: 1;
+}
+
+/* Card hover effects */
+.location-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.location-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Status badges with pulse animation */
+.status-badge-process {
+  position: relative;
+}
+
+.status-badge-process::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  animation: pulse 2s infinite;
+  background-color: rgba(59, 130, 246, 0.5);
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+
+  70% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+
+/* Map container with border */
+#map {
+  border: 2px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* Form input focus states */
+.form-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+/* Modal animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+#addLocationModal {
+  animation: fadeIn 0.3s ease-out;
+}
+
+#addLocationModal>div {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  #map {
+    border-color: #374151;
+  }
+
+  .form-input {
+    background-color: #1f2937;
+    border-color: #374151;
+    color: #f3f4f6;
+  }
+
+  .form-input::placeholder {
+    color: #9ca3af;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Mobile responsiveness improvements */
+@media (max-width: 640px) {
+  .location-card {
+    margin-bottom: 1rem;
+  }
+
+  #map {
+    height: 250px !important;
+  }
+
+  .stats-card {
+    margin-bottom: 1rem;
+  }
+}

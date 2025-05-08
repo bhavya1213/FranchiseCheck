@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Franchise Location Manager</title>
+    <meta name="description" content="Manage and analyze franchise locations with our comprehensive tool">
+
+    <!-- Preload critical resources -->
+    <link rel="preload" href="https://cdn.tailwindcss.com" as="script">
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style">
+
+    <!-- CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+        integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="css/styles.css">
+
+    <!-- Favicon -->
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+</head>
+
+<body class="bg-gray-100 min-h-screen flex flex-col">
+    <div id="app-container" class="flex-1">
+        <!-- Notification Container -->
+        <div id="notification-container" class="fixed top-4 right-4 z-50 w-80 space-y-2"></div>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay"
+            class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center hidden">
+            <div class="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+                <p class="text-gray-700">Loading...</p>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="bg-white border-b border-gray-200 dark:bg-gray-900">
+            <div class="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
+                <!-- Logo and Title -->
+                <a href="/"
+                    class="flex items-center space-x-3 rtl:space-x-reverse hover:text-blue-600 transition-colors">
+                    <i class="fa-solid fa-location-dot text-xl text-blue-600"></i>
+                    <span class="self-center text-2xl font-semibold whitespace-nowrap dark:text-white">
+                        Franchise Location Manager
+                    </span>
+                </a>
+
+                <!-- Mobile menu button -->
+                <button id="mobile-menu-button" class="md:hidden p-2 rounded-md text-gray-700 hover:bg-gray-100">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+
+                <!-- Navigation Links -->
+                <div class="hidden w-full md:flex md:w-auto md:order-1" id="navbar-menu">
+                    <ul
+                        class="flex flex-col font-medium p-4 md:p-0 mt-4 border border-gray-100 rounded-lg bg-gray-50 
+                              md:space-x-8 md:flex-row md:mt-0 md:border-0 md:bg-white dark:bg-gray-800 md:dark:bg-gray-900">
+                        <li>
+                            <a href="/" class="block py-2 px-3 text-gray-900 rounded-sm hover:bg-gray-100 dark:text-white 
+                                           hover:text-blue-600 transition-colors">
+                                <i class="fas fa-home mr-2"></i>Dashboard
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/map" class="block py-2 px-3 text-gray-900 rounded-sm hover:bg-gray-100 dark:text-white 
+                                              hover:text-blue-600 transition-colors">
+                                <i class="fas fa-map mr-2"></i>Map View
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/feasibility" class="block py-2 px-3 text-gray-900 rounded-sm hover:bg-gray-100 dark:text-white 
+                                                   hover:text-blue-600 transition-colors">
+                                <i class="fas fa-check-circle mr-2"></i>Check Feasibility
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/setting" class="block py-2 px-3 text-gray-900 rounded-sm hover:bg-gray-100 dark:text-white 
+                                                    hover:text-blue-600 transition-colors">
+                                <i class="fas fa-cog mr-2"></i>Settings
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="content-wrap p-4 max-w-screen-xl mx-auto w-full flex-1">
+            <div class="container mx-auto px-4 py-8">
+                <!-- settings.html (or wherever your settings section is) -->
+                <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                    <h2 class="text-xl font-semibold mb-4">Location Radius Settings</h2>
+                    <div class="mb-4">
+                        <label for="settings-distance-input" class="block text-sm font-medium text-gray-700 mb-2">
+                            Default Radius (miles)
+                        </label>
+                        <div class="flex items-center gap-4">
+                            <!-- Number Input Field -->
+                            <input type="number" id="settings-distance-input" min="5" max="100" value="5"
+                                class="w-24 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                            <!-- Save Button (kept as before) -->
+                            <button id="save-distance-settings"
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm transition-colors">
+                                Save Radius Settings
+                            </button>
+                        </div>
+                        <!-- Validation Help Text (Optional) -->
+                        <p class="mt-1 text-xs text-gray-500">
+                            Must be between 5 and 100 miles.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white rounded-lg shadow-sm dark:bg-gray-800 mt-auto">
+        <div class="w-full mx-auto max-w-screen-xl p-4 md:flex md:items-center md:justify-between">
+            <span class="text-sm text-gray-500 sm:text-center dark:text-gray-400">
+                © <span id="current-year"></span> Franchise Location Manager. All Rights Reserved.
+            </span>
+            <ul class="flex flex-wrap items-center mt-3 text-sm font-medium text-gray-500 dark:text-gray-400 sm:mt-0">
+                <li><a href="#" class="hover:underline me-4 md:me-6">About</a></li>
+                <li><a href="#" class="hover:underline me-4 md:me-6">Privacy Policy</a></li>
+                <li><a href="#" class="hover:underline me-4 md:me-6">Licensing</a></li>
+                <li><a href="#" class="hover:underline">Contact</a></li>
+            </ul>
+        </div>
+    </footer>
+
+    <script src="js/index.js"></script>
+    <script src="js/app.js"></script>
+    <!-- JavaScript -->
+    <script>
+        // Set current year in footer
+        document.getElementById('current-year').textContent = new Date().getFullYear();
+
+        // Mobile menu toggle
+        document.getElementById('mobile-menu-button').addEventListener('click', function () {
+            const menu = document.getElementById('navbar-menu');
+            menu.classList.toggle('hidden');
+        });
+
+        // settings.js
+        document.addEventListener('DOMContentLoaded', function () {
+            const distanceRange = document.getElementById('settings-distance-range');
+            const distanceValue = document.getElementById('settings-distance-value');
+            const saveBtn = document.getElementById('save-distance-settings');
+
+            // Load saved distance
+            const savedDistance = localStorage.getItem('settings-distance-input') || 5;
+            distanceRange.value = savedDistance;
+            distanceValue.textContent = `${savedDistance} miles`;
+
+            // Update display when slider changes
+            distanceRange.addEventListener('input', function () {
+                distanceValue.textContent = `${this.value} miles`;
+            });
+
+            // Save settings
+            saveBtn.addEventListener('click', function () {
+                const selectedDistance = distanceRange.value;
+                localStorage.setItem('settings-distance-input', selectedDistance);
+
+                // Show notification (you may need to implement this)
+                showNotification('success', `Default radius set to ${selectedDistance} miles`);
+
+                // Optional: Close settings modal if you have one
+                // closeSettingsModal();
+            });
+        });
+    </script>
+
+</body>
+
+</html>
