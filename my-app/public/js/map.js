@@ -1,5 +1,5 @@
-  // Initialize the ArcGIS map
-  require([
+// Initialize the ArcGIS map
+require([
     "esri/Map",
     "esri/views/MapView",
     "esri/widgets/BasemapToggle",
@@ -28,8 +28,11 @@
     const view = new MapView({
         container: "mapViewDiv",
         map: map,
-        center: [-98.5795, 39.8283], // Center of the US
-        zoom: 4
+        center: [-98.5795, 39.8283],
+        zoom: 4,
+        ui: {
+            components: []
+        }
     });
 
     // Add widgets
@@ -73,11 +76,29 @@
         return params;
     }
 
+    // Function to get marker color based on status
+    function getMarkerColor(status) {
+        switch (status.toLowerCase()) {
+            case 'approved':
+                return [56, 168, 0]; // Green
+            case 'pending':
+            case 'in process':
+                return [255, 255, 153]; // Yellow
+            case 'rejected':
+                return [226, 50, 40]; // Red
+            default:
+                return [226, 119, 40]; // Orange (default)
+        }
+    }
+
     // Function to add marker to map
     function addMarkerToMap(location) {
+        // Get color based on status
+        const color = getMarkerColor(location.status);
+
         // Create a symbol for the marker
         const markerSymbol = new SimpleMarkerSymbol({
-            color: [226, 119, 40],  // Orange
+            color: color,
             outline: {
                 color: [255, 255, 255], // White
                 width: 1
@@ -119,11 +140,34 @@
     function addLocationToPanel(location) {
         const panel = document.getElementById('locationsPanel');
         const card = document.createElement('div');
-        card.className = 'bg-white p-4 rounded shadow-sm min-w-[200px] flex-1 hover:shadow-md transition-shadow cursor-pointer';
+
+        // Add status-based border color
+        let borderColor = 'border-gray-300';
+        switch (location.status.toLowerCase()) {
+            case 'approved':
+                borderColor = 'border-green-500';
+                break;
+            case 'pending':
+            case 'in process':
+                borderColor = 'border-yellow-500';
+                break;
+            case 'rejected':
+                borderColor = 'border-red-500';
+                break;
+        }
+
+        card.className = `bg-white p-4 rounded shadow-sm min-w-[200px] flex-1 hover:shadow-md transition-shadow cursor-pointer border-l-4 ${borderColor}`;
         card.innerHTML = `
             <h3 class="text-lg font-semibold mb-1">${location.name}</h3>
             <p><strong>Address:</strong> ${location.address}</p>
-            <p><strong>Status:</strong> ${location.status}</p>
+            <p><strong>Status:</strong> 
+                <span class="px-2 py-1 rounded text-xs ${location.status.toLowerCase() === 'approved' ? 'bg-green-100 text-green-800' :
+                (location.status.toLowerCase() === 'pending' || location.status.toLowerCase() === 'in process') ? 'bg-yellow-100 text-yellow-800' :
+                    location.status.toLowerCase() === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+            }">
+                    ${location.status}
+                </span>
+            </p>
             <p class="text-sm text-gray-600 mt-2">Coordinates: ${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}</p>
         `;
 

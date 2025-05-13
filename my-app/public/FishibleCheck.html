@@ -9,75 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- ArcGIS CSS -->
     <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
-    <style>
-        .search-container {
-            position: relative;
-            display: flex;
-            margin-bottom: 10px;
-        }
-
-        #location-search {
-            flex: 1;
-            padding: 8px 12px;
-            border: 1px solid #ccc;
-            border-radius: 4px 0 0 4px;
-        }
-
-        #search-btn {
-            padding: 8px 12px;
-            background: #4a90e2;
-            color: white;
-            border: none;
-            border-radius: 0 4px 4px 0;
-            cursor: pointer;
-        }
-
-        #search-btn:hover {
-            background: #3a7bc8;
-        }
-
-        .suggestions-container {
-            position: relative;
-            width: 100%;
-        }
-
-        .suggestions-list {
-            position: absolute;
-            z-index: 1000;
-            width: 100%;
-            max-height: 200px;
-            overflow-y: auto;
-            background: white;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-            display: none;
-        }
-
-        .suggestion-item {
-            padding: 8px 12px;
-            cursor: pointer;
-        }
-
-        .suggestion-item:hover {
-            background-color: #f0f0f0;
-        }
-
-        #location-map {
-            height: 400px;
-            width: 100%;
-            margin-top: 20px;
-        }
-
-        .result-card {
-            transition: all 0.3s ease;
-        }
-
-        .result-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-        }
-    </style>
+    <link rel="stylesheet" href="css/feasblity.css">
 </head>
 
 <body class="bg-gray-100 min-h-screen">
@@ -126,17 +58,12 @@
                         </a>
                     </li>
                     <li>
-                        <a href="/feasibility"
-                            class="block py-2 px-3 text-white bg-blue-600 rounded-sm hover:bg-blue-700">
+                        <a href="/feasibility" class="block py-2 px-3 text-gray-900 rounded-sm hover:bg-gray-100 dark:text-white 
+                                               hover:text-blue-600 transition-colors">
                             <i class="fas fa-check-circle mr-2"></i>Check Feasibility
                         </a>
                     </li>
-                    <li>
-                        <a href="/setting" class="block py-2 px-3 text-gray-900 rounded-sm hover:bg-gray-100 dark:text-white 
-                                                hover:text-blue-600 transition-colors">
-                            <i class="fas fa-cog mr-2"></i>Settings
-                        </a>
-                    </li>
+
                 </ul>
             </div>
         </div>

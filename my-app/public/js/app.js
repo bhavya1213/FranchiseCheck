@@ -1,6 +1,5 @@
-// Mobile menu toggle functionality
+// Mobile menu toggle
 document.getElementById('mobile-menu-button').addEventListener('click', function () {
-    const menu = document.getElementById('navbar-default');
+    const menu = document.getElementById('navbar-menu');
     menu.classList.toggle('hidden');
 });
-

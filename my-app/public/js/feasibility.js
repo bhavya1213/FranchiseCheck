@@ -44,7 +44,10 @@ function initMap() {
                     container: "location-map",
                     map: map,
                     center: [0, 20], // longitude, latitude
-                    zoom: 2
+                    zoom: 2,
+                    ui: {
+                        components: []
+                    }
                 });
 
                 // Create a graphic for the marker
@@ -100,11 +103,23 @@ function initLocator() {
     );
 }
 
-// Load settings from localStorage
-function loadSettings() {
-    const savedDistance = localStorage.getItem('selectedDistance') || 5;
-    document.getElementById('current-distance').textContent = `${savedDistance} miles`;
-    return savedDistance;
+// Load settings from API
+async function loadSettings() {
+    try {
+        const response = await fetch('/api/miles');
+        if (!response.ok) throw new Error('Failed to load settings');
+
+        const data = await response.json();
+        const savedDistance = data.mile || 5;
+
+        document.getElementById('current-distance').textContent = `${savedDistance} miles`;
+        document.getElementById('settings-distance-input').value = savedDistance;
+
+        return savedDistance;
+    } catch (error) {
+        console.error('Error loading settings:', error);
+        return 5; // Default value
+    }
 }
 
 // Fetch existing franchise locations
@@ -144,6 +159,40 @@ function setupEventListeners() {
         if (!addressInput.contains(e.target) && !suggestionsList.contains(e.target)) {
             suggestionsList.style.display = 'none';
         }
+    });
+
+    // Setting save button
+
+    document.getElementById('save-distance-settings').addEventListener('click', async () => {
+        const inputElement = document.getElementById('settings-distance-input');
+        const mileValue = parseInt(inputElement.value);
+
+        if (isNaN(mileValue) || mileValue < 5 || mileValue > 100) {
+            alert('please enter value between 5 and 100');
+            return;
+        }
+        try {
+            const response = await fetch('/api/miles', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ mile: mileValue })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to save setting');
+            }
+
+            const data = await response.json();
+            alert('Settings saved successfully!');
+            console.log('Saved Data', data);
+        } catch (error) {
+            console.error('Error:', error);
+            alert(error.message);
+        }
+
     });
 }
 
@@ -326,58 +375,6 @@ function updateFormCoordinates(lat, lng) {
     document.getElementById('lng').value = lng.toFixed(6);
 }
 
-// Check location feasibility
-function checkFeasibility() {
-    const lat = parseFloat(document.getElementById('lat').value);
-    const lng = parseFloat(document.getElementById('lng').value);
-
-    if (isNaN(lat)) {
-        showNotification('error', 'Please select a location on the map or provide an address');
-        return;
-    }
-
-    showLoading(true);
-
-    // Get the distance threshold from settings
-    const distanceThreshold = parseFloat(loadSettings());
-
-    // Check against existing locations
-    const result = analyzeLocation(lat, lng, existingLocations, distanceThreshold);
-
-    // Display results
-    displayResults(result, distanceThreshold);
-
-    showLoading(false);
-}
-
-// Analyze location against existing locations
-function analyzeLocation(lat, lng, existingLocations, distanceThreshold) {
-    let nearestLocation = null;
-    let minDistance = Infinity;
-    let isFeasible = true;
-
-    // Check distance to each existing location
-    existingLocations.forEach(location => {
-        const distance = calculateDistance(lat, lng, location.lat, location.lng);
-
-        if (distance < minDistance) {
-            minDistance = distance;
-            nearestLocation = location;
-        }
-
-        if (distance < distanceThreshold) {
-            isFeasible = false;
-        }
-    });
-
-    return {
-        isFeasible,
-        distanceToNearest: minDistance,
-        nearestLocation,
-        distanceThreshold
-    };
-}
-
 // Calculate distance between two points (Haversine formula)
 function calculateDistance(lat1, lng1, lat2, lng2) {
     const R = 3958.8; // Radius of the Earth in miles
@@ -395,78 +392,180 @@ function toRadians(degrees) {
     return degrees * (Math.PI / 180);
 }
 
-// Display feasibility results
+function analyzeLocation(lat, lng, existingLocations, distanceThreshold) {
+    // Filter out the exact location being checked
+    const filteredLocations = existingLocations.filter(location => {
+        const isSameLocation = Math.abs(lat - location.lat) < 0.0001 && Math.abs(lng - location.lng) < 0.0001;
+        return !isSameLocation;
+    });
+
+    let nearestLocation = null;
+    let nearestApprovedLocation = null;
+    let minDistance = Infinity;
+    let minApprovedDistance = Infinity;
+    let isFeasible = true;
+
+    filteredLocations.forEach(location => {
+        const distance = calculateDistance(lat, lng, location.lat, location.lng);
+
+        // Always track the nearest location regardless of status
+        if (distance < minDistance) {
+            minDistance = distance;
+            nearestLocation = location;
+        }
+
+        // Only track approved locations for the approved distance check
+        if (location.status.toLowerCase() === 'approved' && distance < minApprovedDistance) {
+            minApprovedDistance = distance;
+            nearestApprovedLocation = location;
+        }
+    });
+
+    // Feasibility is determined by distance to approved locations only
+    isFeasible = minApprovedDistance >= distanceThreshold;
+
+    return {
+        isFeasible,
+        distanceToNearest: minDistance,
+        nearestLocation,
+        distanceToNearestApproved: minApprovedDistance,
+        nearestApprovedLocation,
+        distanceThreshold,
+        checkedLocationsCount: filteredLocations.length
+    };
+}
+
+
+async function checkFeasibility() {
+    const lat = parseFloat(document.getElementById('lat').value);
+    const lng = parseFloat(document.getElementById('lng').value);
+
+    if (isNaN(lat)) {
+        showNotification('error', 'Please select a location on the map or provide an address');
+        return;
+    }
+
+    showLoading(true);
+
+    try {
+        // Get the current distance threshold
+        const response = await fetch('/api/miles');
+        if (!response.ok) throw new Error('Failed to load distance setting');
+        const settings = await response.json();
+        const distanceThreshold = settings.mile || 5;
+
+        let result = analyzeLocation(lat, lng, existingLocations, distanceThreshold);
+
+        if (result.checkedLocationsCount === 0) {
+            result = analyzeLocation(lat, lng, existingLocations, distanceThreshold);
+            result.globalSearch = true;
+        }
+
+        // Display results
+        displayResults(result, distanceThreshold);
+    } catch (error) {
+        console.error('Feasibility check error:', error);
+        showNotification('error', 'Error checking feasibility');
+    } finally {
+        showLoading(false);
+    }
+}
+
 function displayResults(result, distanceThreshold) {
     // Show the results section
     document.getElementById('results-section').classList.remove('hidden');
 
-    // Update feasibility card
+    // Get elements
     const feasibilityCard = document.getElementById('feasibility-result-card');
     const feasibilityIcon = document.getElementById('feasibility-icon');
     const feasibilityStatus = document.getElementById('feasibility-status');
     const feasibilityDetails = document.getElementById('feasibility-details');
+    const nearestDetails = document.getElementById('nearest-location-details');
 
+    // Determine feasibility
     if (result.isFeasible) {
-        feasibilityCard.classList.remove('border-blue-500');
-        feasibilityCard.classList.add('border-green-500');
-        feasibilityIcon.innerHTML = '<i class="fas fa-check-circle text-green-500"></i>';
+        // Location is feasible
+        feasibilityCard.className = 'border-l-4 border-green-500 bg-green-50 p-4 mb-4';
+        feasibilityIcon.innerHTML = '<i class="fas fa-check-circle text-green-500 text-2xl"></i>';
         feasibilityStatus.textContent = 'Location is Feasible';
         feasibilityStatus.className = 'text-lg font-semibold text-green-600';
+
         feasibilityDetails.innerHTML = `
-             <p>This location meets your minimum distance requirement of ${distanceThreshold} miles from existing franchises.</p>
-             <p class="font-medium">Nearest franchise is ${result.distanceToNearest.toFixed(1)} miles away.</p>
-         `;
+            <p class="text-gray-700">This location meets your minimum distance requirement of <strong>${distanceThreshold} miles</strong> from approved franchises.</p>
+        `;
+
+        nearestDetails.innerHTML = `
+            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+                <h4 class="text-yellow-600 font-semibold mb-2">
+                    <i class="fas fa-map-marker-alt text-yellow-500"></i> Nearest Franchise
+                </h4>
+                <p>No nearby franchises found.</p>
+            </div>
+        `;
     } else {
-        feasibilityCard.classList.remove('border-blue-500');
-        feasibilityCard.classList.add('border-red-500');
-        feasibilityIcon.innerHTML = '<i class="fas fa-times-circle text-red-500"></i>';
+        // Location is not feasible
+        feasibilityCard.className = 'border-l-4 border-red-500 bg-red-50 p-4 mb-4';
+        feasibilityIcon.innerHTML = '<i class="fas fa-times-circle text-red-500 text-2xl"></i>';
         feasibilityStatus.textContent = 'Location is Not Feasible';
         feasibilityStatus.className = 'text-lg font-semibold text-red-600';
-        feasibilityDetails.innerHTML = `
-             <p>This location is too close to an existing franchise (${result.distanceToNearest.toFixed(1)} miles away).</p>
-             <p class="font-medium">Your minimum required distance is ${distanceThreshold} miles.</p>
-         `;
-    }
 
-    // Update nearest location card
-    const nearestDetails = document.getElementById('nearest-location-details');
-    if (result.nearestLocation) {
-        nearestDetails.innerHTML = `
-             <p><strong>Name:</strong> ${result.nearestLocation.name || 'Unknown'}</p>
-             <p><strong>Address:</strong> ${result.nearestLocation.address || 'Unknown'}</p>
-             <p><strong>Distance:</strong> ${result.distanceToNearest.toFixed(1)} miles</p>
-             <p><strong>Status:</strong> ${result.nearestLocation.status || 'Unknown'}</p>
-         `;
-    } else {
-        nearestDetails.innerHTML = '<p>No nearby franchises found in your network.</p>';
-    }
+        // Approved franchise details
+        let detailsHtml = `
+            <p class="text-gray-700">This location is too close to an approved franchise (<strong>${result.distanceToNearestApproved.toFixed(1)} miles</strong> away).</p>
+            <p class="text-gray-700 font-medium mt-2">Minimum required distance is <strong>${distanceThreshold} miles</strong> from approved franchises.</p>
+        `;
 
-    // Update detailed results
-    const detailedResults = document.getElementById('detailed-results');
-    detailedResults.innerHTML = `
-         <div class="border-b pb-4 mb-4">
-             <h4 class="font-medium text-gray-800 mb-2">Feasibility Summary</h4>
-             <p>${result.isFeasible ?
-            'This location meets all your feasibility requirements.' :
-            'This location does not meet your minimum distance requirement.'}
-             </p>
-         </div>
-         
-         <div class="border-b pb-4 mb-4">
-             <h4 class="font-medium text-gray-800 mb-2">Distance Analysis</h4>
-             <p>Minimum required distance between franchises: <strong>${distanceThreshold} miles</strong></p>
-             <p>Distance to nearest existing franchise: <strong>${result.distanceToNearest.toFixed(1)} miles</strong></p>
-         </div>
-         
-         <div>
-             <h4 class="font-medium text-gray-800 mb-2">Recommendation</h4>
-             <p class="${result.isFeasible ? 'text-green-600' : 'text-red-600'} font-medium">
-                 ${result.isFeasible ?
-            '✓ This location is suitable for a new franchise.' :
-            '✗ This location is not suitable due to proximity to existing franchises.'}
-             </p>
-         </div>
-     `;
+        if (result.nearestApprovedLocation) {
+            detailsHtml += `
+                <div class="mt-4 border-t pt-4">
+                    <h4 class="font-medium text-gray-800 mb-2">Nearest Approved Franchise</h4>
+                    <p><strong>Name:</strong> ${result.nearestApprovedLocation.name || 'Unknown'}</p>
+                    <p><strong>Address:</strong> ${result.nearestApprovedLocation.address || 'Unknown'}</p>
+                    <p><strong>Distance:</strong> ${result.distanceToNearestApproved.toFixed(1)} miles</p>
+                    <p><strong>Status:</strong> <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Approved</span></p>
+                </div>
+            `;
+        }
+
+        feasibilityDetails.innerHTML = detailsHtml;
+
+        // Nearest franchise details (if different from approved)
+        if (!result.nearestApprovedLocation || result.nearestLocation.id !== result.nearestApprovedLocation.id) {
+            nearestDetails.innerHTML = `
+                <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+                    <h4 class="text-yellow-600 font-semibold mb-2">
+                        <i class="fas fa-map-marker-alt text-yellow-500"></i> Nearest Franchise
+                    </h4>
+                    <p><strong>Name:</strong> ${result.nearestLocation.name || 'Unknown'}</p>
+                    <p><strong>Address:</strong> ${result.nearestLocation.address || 'Unknown'}</p>
+                    <p><strong>Distance:</strong> ${result.distanceToNearest.toFixed(1)} miles</p>
+                    <p><strong>Status:</strong> <span class="${getStatusColorClass(result.nearestLocation.status)}">${result.nearestLocation.status}</span></p>
+                </div>
+            `;
+        } else {
+            nearestDetails.innerHTML = `
+                <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+                    <h4 class="text-yellow-600 font-semibold mb-2">
+                        <i class="fas fa-map-marker-alt text-yellow-500"></i> Nearest Franchise
+                    </h4>
+                    <p>No nearby franchises found.</p>
+                </div>
+            `;
+        }
+    }
+}
+
+
+
+// Helper function to get color class based on status
+function getStatusColorClass(status) {
+    if (!status) return 'text-gray-600';
+    const lowerStatus = status.toLowerCase();
+    if (lowerStatus.includes('approved')) return 'text-green-600';
+    if (lowerStatus.includes('process')) return 'text-yellow-600';
+    if (lowerStatus.includes('pending')) return 'text-blue-600';
+    if (lowerStatus.includes('rejected') || lowerStatus.includes('denied')) return 'text-red-600';
+    return 'text-gray-600';
 }
 
 // Show loading state
@@ -495,3 +594,16 @@ function showNotification(type, message) {
         notification.remove();
     }, 5000);
 }
+
+
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const response = await fetch('/api/miles');
+        if (!response.ok) throw new Error('Failed to load setting');
+
+        const data = await response.json();
+        document.getElementById('settings-distance-input').value = data.mile || 5;
+    } catch (error) {
+        console.error('Error loading setting', error);
+    }
+});

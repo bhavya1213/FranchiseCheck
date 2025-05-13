@@ -10,7 +10,7 @@ const pool = new Pool({
     database: 'franchise',
     password: 'root', // change to your PostgreSQL password
     port: 5432,
-});
+});     
 
 // Initialize database table
 async function initializeDatabase() {
@@ -33,11 +33,11 @@ async function initializeDatabase() {
         `);
 
         await pool.query(`
-            CREATE TABLE IF NOT EXISTS miles (
-                id SERIAL PRIMARY KEY,
-                mile INTEGER NOT NULL,
-                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-                )
+          CREATE TABLE IF NOT EXISTS miles (
+            id SERIAL PRIMARY KEY,
+            mile INTEGER NOT NULL DEFAULT 5 CHECK (mile >= 5 AND mile <= 100),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
             `);
         console.log('Database table initialized successfully');
     } catch (err) {
@@ -54,9 +54,17 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Routes
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+app.get('/', (req, res)=>{
+    try{
+       res.send("Franchise check Server running"); 
+    } catch(error){
+        console.error('Error handling request', error);
+        res.status(500).json("Server Error");
+    }
 });
+// app.get('/', (req, res) => {
+//     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// });
 
 app.get('/map', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'map.html'));
@@ -136,52 +144,72 @@ app.post('/api/locations', async (req, res) => {
 app.post('/api/miles', async (req, res) => {
     const { mile } = req.body;
 
+    if (mile === undefined || mile === null) {
+        return res.status(400).json({ error: 'Miles value is required' });
+    }
+
+    const mileNumber = Number(mile);
+    if (isNaN(mileNumber)) {
+        return res.status(400).json({ error: 'Miles must be a number' });
+    }
+
+    if (mileNumber < 5 || mileNumber > 100) {
+        return res.status(400).json({
+            error: 'Mile value must be between 5 and 100'
+        })
+    }
     try {
-        const query = `
-            INSERT INTO miles (mile, created_at) VALUES ($1, CURRENT_TIMESTAMP) RETURNING id, mile, created_at
-        `;
-        const values = [
-            mile
-        ];
-        const { rows } = await pool.query(query, values);
-        res.status(201).json(rows[0]);
+
+        const checkQuery = 'SELECT Id FROM miles LIMIT 1';
+        const { rows: existingsRow } = await pool.query(checkQuery);
+
+        let result;
+        if (existingsRow.length > 0) {
+            const updateQuery = `
+                UPDATE miles
+                SET mile = $1, created_at = CURRENT_TIMESTAMP 
+                WHERE id = $2
+                RETURNING id, mile, created_at 
+                `;
+            result = await pool.query(updateQuery, [mileNumber, existingsRow[0].id]);
+        } else {
+            const insertQuery = `
+                INSERT INTO miles (mile, created_at) 
+                VALUES ($1, CURRENT_TIMESTAMP) 
+                RETURNING id, mile, created_at
+            `;
+            result = await pool.query(insertQuery, [mileNumber]);
+        }
+
+        res.status(200).json(result.rows[0]);
     } catch (error) {
         console.log('Error in /api/miles (POST):', error);
-        res.status(500).json({ error: 'Error adding a miles in to the database in /api/miles (POST)', details: error.message });
+        res.status(500).json({
+            error: 'Error saving miles to database',
+            details: error.message
+        });
     }
 });
 
-app.get('', async (req, res) => {
-    try{
-        
-    }catch{
-        
+app.get('/api/miles', async (req, res) => {
+    try {
+        const query = `
+            SELECT id, mile, created_at 
+            FROM miles 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        `;
+        const { rows } = await pool.query(query);
+        const result = rows.length > 0 ? rows[0] : { mile: 5 }
+        res.status(200).json(result);
+    } catch (error) {
+        console.log('Error in /api/miles (GET):', error);
+        res.status(500).json({
+            error: 'Error fetching miles from the database',
+            details: error.message
+        });
     }
 });
-
-// app.get('/api/locations/searchByName', async (req, res) => {
-//     const { address } = req.query;
-
-//     if (!address) {
-//         return res.status(400).json({ error: 'Name query parameter is required for search in /api/locations/searchByName (GET)' });
-//     }
-
-//     try {
-//         const query = `
-//             SELECT 
-//           *
-//             FROM location_data
-//             WHERE address ILIKE '%' || $1
-//             ORDER BY created_at DESC
-//         `;
-//         const { rows } = await pool.query(query, [address]);
-//         res.json(rows);
-//         console.log(rows);
-//     } catch (err) {
-//         console.error('Error in /api/locations/searchByName (GET):', err);
-//         res.status(500).json({ error: `${err} Error searching locations by address in the database in /api/locations/searchByName (GET)` });
-//     }
-// });
 
 app.get('/api/locations/nearby', async (req, res) => {
     const { lat, lng, distance = 5 } = req.query;
@@ -302,6 +330,7 @@ app.listen(PORT, HOST, () => {
 
 const os = require('os');
 const { error } = require('console');
+const { exit } = require('process');
 
 function getLocalIP() {
     const interfaces = os.networkInterfaces();
@@ -313,5 +342,4 @@ function getLocalIP() {
         }
     }
     return 'localhost';
-}
-;
+};

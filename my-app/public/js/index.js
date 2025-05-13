@@ -9,12 +9,18 @@ window.dojoConfig = {
     ]
 };
 // Global variables to hold ArcGIS components
-let map, view, markerGraphic, locator;
+let map, view, markerGraphic, locator, graphicsLayer;
 
 // Initialize the ArcGIS map with error handling
 function initMap() {
-    require(["esri/Map", "esri/views/MapView", "esri/Graphic", "esri/geometry/Point"],
-        function (Map, MapView, Graphic, Point) {
+    require([
+        "esri/Map",
+        "esri/views/MapView",
+        "esri/Graphic",
+        "esri/layers/GraphicsLayer",
+        "esri/geometry/Point"
+    ],
+        function (Map, MapView, Graphic, GraphicsLayer, Point) {
 
             try {
                 // Create the map
@@ -27,34 +33,29 @@ function initMap() {
                     container: "location-map",
                     map: map,
                     center: [0, 20], // longitude, latitude
-                    zoom: 2
+                    zoom: 2,
+                    ui: {
+                        components: []
+                    }
                 });
 
                 // Create a graphic for the marker
-                markerGraphic = new Graphic({
-                    symbol: {
-                        type: "simple-marker",
-                        color: [226, 119, 40],
-                        outline: {
-                            color: [255, 255, 255],
-                            width: 2
-                        }
-                    }
-                });
-                map.add(markerGraphic);
+                graphicsLayer = new GraphicsLayer();
+                map.add(graphicsLayer);
 
-                // Map click handler
-                view.on("click", function (event) {
-                    const point = new Point({
-                        longitude: event.mapPoint.longitude,
-                        latitude: event.mapPoint.latitude
+                // Wait for view to be ready
+                view.when(function () {
+                    // Map click handler
+                    view.on("click", function (event) {
+                        const point = new Point({
+                            longitude: event.mapPoint.longitude,
+                            latitude: event.mapPoint.latitude
+                        });
+
+                        updateMapMarker(point);
+                        updateFormCoordinates(point.latitude, point.longitude);
+                        reverseGeocode(point);
                     });
-
-                    updateMapMarker(point);
-                    updateFormCoordinates(point.latitude, point.longitude);
-
-                    // Reverse geocode to get address
-                    reverseGeocode(point);
                 });
 
                 // Initialize locator after map is ready
@@ -110,24 +111,34 @@ function updateMapMarker(point) {
     require(["esri/Graphic"],
         function (Graphic) {
             try {
-                // Remove previous graphic
-                map.remove(markerGraphic);
+
+                const markerSymbol = {
+                    type: "simple-marker",
+                    color: "red",
+                    size: "12px",
+                    outline: {
+                        color: "white",
+                        width: 1
+                    }
+                };
 
                 // Create new graphic
                 markerGraphic = new Graphic({
                     geometry: point,
-                    symbol: {
-                        type: "simple-marker",
-                        color: [226, 119, 40],
-                        outline: {
-                            color: [255, 255, 255],
-                            width: 2
-                        }
-                    }
+                    symbol: markerSymbol
                 });
 
-                map.add(markerGraphic);
-                view.goTo(point, { zoom: 15 });
+                // Remove previous graphic
+                graphicsLayer.removeAll();
+                graphicsLayer.add(markerGraphic);
+                // Center view on the point
+                view.goTo({
+                    target: point,
+                    zoom: 15
+                }).catch(function (error) {
+                    console.error("Error centering view:", error);
+                });
+
             } catch (error) {
                 console.error("Error updating map marker:", error);
             }
@@ -145,7 +156,6 @@ const submitBtn = document.getElementById('submit-btn');
 const cancelBtn = document.getElementById('cancel-btn');
 const clearBtn = document.getElementById('clear-btn');
 const searchInput = document.getElementById('search-input');
-const searchAddressBtn = document.getElementById('search-address-btn');
 const locationsTableBody = document.getElementById('locations-table-body');
 const loadingRow = document.getElementById('loading-row');
 const loadingOverlay = document.getElementById('loading-overlay');
@@ -156,7 +166,7 @@ const suggestionsList = document.getElementById('suggestions-list');
 
 // State
 let currentPage = 1;
-const itemsPerPage = 9;
+const itemsPerPage = 11;
 let totalLocations = 0;
 let isEditing = false;
 const existingLocations = [];
@@ -186,9 +196,6 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchLocations();
     });
 
-    // Address search button
-    searchAddressBtn.addEventListener('click', geocodeAddress);
-
     // Address input suggestions
     addressInput.addEventListener('input', handleAddressInput);
     addressInput.addEventListener('focus', handleAddressInput);
@@ -202,17 +209,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add search functionality
     const locationSearch = document.getElementById('location-search');
-    const searchBtn = document.getElementById('search-btn');
-
-    // Handle search button click
-    searchBtn.addEventListener('click', handleLocationSearch);
 
     // Handle Enter key in search
-    locationSearch.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            handleLocationSearch();
-        }
-    });
+    if (locationSearch && searchBtn) {
+
+        locationSearch.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleLocationSearch();
+            }
+        });
+
+    } else {
+        console.log("Search input or button not found. Make sure the elements exist in the DOM.");
+    }
 });
 
 // Handle address input for suggestions
@@ -583,26 +593,30 @@ function renderLocations(locations) {
 
     locationsTableBody.innerHTML = paginatedLocations.map(location => `
           <tr class="hover:bg-gray-50 cursor-pointer" data-id="${location.id}" onclick="showLocationDetails('${location.id}')">
-              <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="font-medium text-gray-900">${location.name}</div>
-              </td>
-              <td class="px-6 py-4">
-                  <div class="text-gray-600 max-w-xs truncate">${location.address}</div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColorClass(location.status)}">
-                      ${location.status}
-                  </span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button onclick="event.stopPropagation(); editLocation('${location.id}')" class="text-blue-600 hover:text-blue-900 mr-3">
-                      <i class="fas fa-edit"></i>
-                  </button>
-                  <button onclick="event.stopPropagation(); deleteLocation('${location.id}')" class="text-red-600 hover:text-red-900">
-                      <i class="fas fa-trash"></i>
-                  </button>
-              </td>
-          </tr>
+            <td class="px-6 py-4 text-left">
+                <div class="font-medium text-gray-900">${location.name}</div>
+            </td>
+            <td class="px-6 py-4 text-left">
+                <div class="text-gray-600 max-w-xs truncate mx-auto">${location.address}</div>
+            </td>
+            <td class="px-6 py-4 text-center">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColorClass(location.status)}">
+                    ${location.status}
+                </span>
+            </td>
+            <td class="px-6 py-4 text-center whitespace-nowrap">
+                <div class="flex justify-center space-x-3">
+                    <button onclick="event.stopPropagation(); editLocation('${location.id}')" 
+                            class="text-blue-600 hover:text-blue-900">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="event.stopPropagation(); deleteLocation('${location.id}')" 
+                            class="text-red-600 hover:text-red-900">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
       `).join('');
 }
 
@@ -618,11 +632,16 @@ async function handleFormSubmit(e) {
     const address = document.getElementById('address').value.trim();
     let status = document.getElementById('status').value;
 
-    // Get distance threshold (default 5 miles)
-    const selectedDistance = parseFloat(localStorage.getItem('selectedDistance')) || 5;
-    const radiusMeters = selectedDistance * 1609.34;
-
     try {
+        // Fetch the distance threshold from the server
+        const response = await fetch('/api/miles');
+        if (!response.ok) {
+            throw new Error('Failed to fetch distance threshold');
+        }
+        const distanceData = await response.json();
+        const selectedDistance = parseFloat(distanceData.mile) || 5; // Default to 5 miles if not found
+        const radiusMeters = selectedDistance * 1609.34;
+
         // Check for valid coordinates
         if (isNaN(lat) || isNaN(lng)) {
             if (address) {
@@ -666,18 +685,18 @@ async function handleFormSubmit(e) {
         const url = isUpdate ? `/api/locations/${locationId}` : '/api/locations';
         const method = isUpdate ? 'PUT' : 'POST';
 
-        const response = await fetch(url, {
+        const saveResponse = await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(formData)
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
+        if (!saveResponse.ok) {
+            const errorData = await saveResponse.json();
             throw new Error(errorData.error || 'Failed to save location');
         }
 
-        const savedLocation = await response.json();
+        const savedLocation = await saveResponse.json();
         const action = isUpdate ? 'updated' : status === 'Rejected' ? 'added (auto-rejected)' : 'added';
         showNotification('error', `Location ${action} successfully!`);
 
@@ -690,6 +709,7 @@ async function handleFormSubmit(e) {
         showLoading(false);
     }
 }
+
 
 // Validate new location against existing locations
 function validateNewLocation(newLocation, existingLocations, radiusMiles = 5) {
@@ -708,13 +728,16 @@ function validateNewLocation(newLocation, existingLocations, radiusMiles = 5) {
 
 // Calculate distance between two coordinates (Haversine formula)
 function calculateDistance(lat1, lng1, lat2, lng2) {
-    const R = 6371000; // Radius of the Earth in meters
-    const dLat = toRadians(lat2 - lat1);
-    const dLng = toRadians(lng2 - lng1);
-    const a = Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
-        Math.sin(dLng / 2) ** 2;
+    const R = 6371008.8; // More precise average Earth radius in meters
+    const φ1 = lat1 * (Math.PI / 180);
+    const φ2 = lat2 * (Math.PI / 180);
+    const Δφ = (lat2 - lat1) * (Math.PI / 180);
+    const Δλ = (lng2 - lng1) * (Math.PI / 180);
+
+    const a = Math.sin(Δφ / 2) ** 2 +
+        Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
     return R * c;
 }
 
