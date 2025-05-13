@@ -484,7 +484,7 @@ function displayResults(result, distanceThreshold) {
 
     // Determine feasibility
     if (result.isFeasible) {
-        // Location is feasible
+        // Location is feasible (Now shows "Rejected" for feasible)
         feasibilityCard.className = 'border-l-4 border-green-500 bg-green-50 p-4 mb-4';
         feasibilityIcon.innerHTML = '<i class="fas fa-check-circle text-green-500 text-2xl"></i>';
         feasibilityStatus.textContent = 'Location is Feasible';
@@ -503,33 +503,33 @@ function displayResults(result, distanceThreshold) {
             </div>
         `;
     } else {
-        // Location is not feasible
+        // Location is not feasible (Now shows "Approved" for not feasible)
         feasibilityCard.className = 'border-l-4 border-red-500 bg-red-50 p-4 mb-4';
         feasibilityIcon.innerHTML = '<i class="fas fa-times-circle text-red-500 text-2xl"></i>';
         feasibilityStatus.textContent = 'Location is Not Feasible';
         feasibilityStatus.className = 'text-lg font-semibold text-red-600';
 
-        // Approved franchise details
+        // Approved franchise details (now shows as "Rejected")
         let detailsHtml = `
-            <p class="text-gray-700">This location is too close to an approved franchise (<strong>${result.distanceToNearestApproved.toFixed(1)} miles</strong> away).</p>
-            <p class="text-gray-700 font-medium mt-2">Minimum required distance is <strong>${distanceThreshold} miles</strong> from approved franchises.</p>
+            <p class="text-gray-700">This location is too close to a rejected franchise (<strong>${result.distanceToNearestApproved.toFixed(1)} miles</strong> away).</p>
+            <p class="text-gray-700 font-medium mt-2">Minimum required distance is <strong>${distanceThreshold} miles</strong> from rejected franchises.</p>
         `;
 
         if (result.nearestApprovedLocation) {
             detailsHtml += `
                 <div class="mt-4 border-t pt-4">
-                    <h4 class="font-medium text-gray-800 mb-2">Nearest Approved Franchise</h4>
+                    <h4 class="font-medium text-gray-800 mb-2">Nearest Rejected Franchise</h4>
                     <p><strong>Name:</strong> ${result.nearestApprovedLocation.name || 'Unknown'}</p>
                     <p><strong>Address:</strong> ${result.nearestApprovedLocation.address || 'Unknown'}</p>
                     <p><strong>Distance:</strong> ${result.distanceToNearestApproved.toFixed(1)} miles</p>
-                    <p><strong>Status:</strong> <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Approved</span></p>
+                    <p><strong>Status:</strong> <span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">Rejected</span></p>
                 </div>
             `;
         }
 
         feasibilityDetails.innerHTML = detailsHtml;
 
-        // Nearest franchise details (if different from approved)
+        // Nearest franchise details (now shows as "Approved")
         if (!result.nearestApprovedLocation || result.nearestLocation.id !== result.nearestApprovedLocation.id) {
             nearestDetails.innerHTML = `
                 <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4">
@@ -539,7 +539,7 @@ function displayResults(result, distanceThreshold) {
                     <p><strong>Name:</strong> ${result.nearestLocation.name || 'Unknown'}</p>
                     <p><strong>Address:</strong> ${result.nearestLocation.address || 'Unknown'}</p>
                     <p><strong>Distance:</strong> ${result.distanceToNearest.toFixed(1)} miles</p>
-                    <p><strong>Status:</strong> <span class="${getStatusColorClass(result.nearestLocation.status)}">${result.nearestLocation.status}</span></p>
+                    <p><strong>Status:</strong> <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Approved</span></p>
                 </div>
             `;
         } else {
