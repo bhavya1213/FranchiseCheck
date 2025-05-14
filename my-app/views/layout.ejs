@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= title %> - Franchise Location Manager
+    </title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- ArcGIS CSS -->
+    <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.29/"></script>
+    <script src="https://js.arcgis.com/4.29/init.js"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+    <!-- Dynamic Styles -->
+    <% if (styles && styles.length > 0) { %>
+        <% styles.forEach(function(style) { %>
+            <link rel="stylesheet" href="<%= style %>">
+        <% }); %>
+    <% } %>
+
+    <!-- Notification Container -->
+    <div id="notification-container" class="fixed top-4 right-4 z-50 w-80 space-y-2"></div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center hidden">
+        <div class="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+            <p class="text-gray-700">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Navbar -->
+    <%- include("partials/navbar") %>
+
+        <!-- Main Content -->
+        <main class="flex-grow container mx-auto px-4 py-8">
+            <%- body %>
+        </main>
+
+        <!-- Footer -->
+        <%- include("partials/footer") %>
+
+            <% if (scripts && scripts.length) { %>
+                <% scripts.forEach(function(script) { %>
+                    <script src="<%= script %>"></script>
+                <% }); %>
+            <% } %>
+
+            <!-- Scripts -->
+            <script src="/js/app.js"></script>
+</body>
+
+</html>

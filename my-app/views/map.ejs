@@ -1,0 +1,17 @@
+<%- include("layout", { title: "MapView" , body: ` <!-- 🗺️ ArcGIS Map Container -->
+    <div class="content-wrap p-4 max-w-screen-xl mx-auto w-full">
+        <!-- 🗺️ ArcGIS Map Container -->
+        <div id="mapViewDiv" class="h-[600px] mt-4 rounded border border-gray-300"></div>
+
+        <!-- 🔲 Dynamic Location Cards Panel (optional) -->
+        <div id="locationsPanel" class="mt-6 hidden flex-wrap gap-4">
+            <!-- Cards will be dynamically injected here -->
+        </div>
+
+    </div>
+
+    <script>
+        const highlightId = "<%= highlightId %>";
+    </script>
+    `
+    }) %>

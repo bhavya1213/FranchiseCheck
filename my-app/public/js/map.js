@@ -197,91 +197,81 @@ require([
     // Load and display all locations
     async function loadLocations() {
         try {
-            // Show loading overlay
             document.getElementById('loading-overlay').classList.remove('hidden');
-
-            // Show locations panel
             document.getElementById('locationsPanel').classList.remove('hidden');
-            document.getElementById('locationsPanel').style.display = 'none';
+            document.getElementById('locationsPanel').style.display = 'block';
 
-            // Check for ID in URL
-            const { id } = getQueryParams();
+            const response = await fetch('/api/locations');
+            const locations = await response.json();
 
-            if (id) {
-                // Load single location
-                const response = await fetch(`/api/locations/${id}`);
-                const location = await response.json();
+            if (locations.length === 0) {
+                document.getElementById('locationsPanel').innerHTML = '<p class="text-gray-500">No locations found.</p>';
+                return;
+            }
 
-                if (location.lat && location.lng) {
-                    addMarkerToMap(location);
-                    addLocationToPanel(location);
+            let highlightedGraphic = null;
 
-                    // Zoom to the location
-                    view.goTo({
-                        center: [location.lng, location.lat],
-                        zoom: 15
-                    }).then(() => {
-                        // Open the popup for the marker
-                        const graphics = graphicsLayer.graphics.filter(g => {
-                            return g.geometry.longitude === location.lng &&
-                                g.geometry.latitude === location.lat;
-                        });
-                        if (graphics.length > 0) {
-                            view.popup.open({
-                                features: [graphics[0]],
-                                location: graphics[0].geometry
-                            });
-                        }
+            locations.forEach(location => {
+                addMarkerToMap(location);
+                addLocationToPanel(location);
+
+                // Check for highlight
+                if (highlightId && location.id.toString() === highlightId.toString()) {
+                    highlightedGraphic = {
+                        lat: location.lat,
+                        lng: location.lng
+                    };
+                }
+            });
+
+            // Zoom
+            if (highlightedGraphic) {
+                await view.goTo({
+                    center: [highlightedGraphic.lng, highlightedGraphic.lat],
+                    zoom: 15
+                });
+
+                // Try to open popup
+                const graphic = graphicsLayer.graphics.find(g =>
+                    g.attributes && g.attributes.id == highlightId
+                );
+
+                if (graphic) {
+                    view.popup.open({
+                        features: [graphic],
+                        location: graphic.geometry
                     });
                 }
             } else {
-                // Load all locations
-                const response = await fetch('/api/locations');
-                const locations = await response.json();
+                const extent = {
+                    xmin: Math.min(...locations.map(loc => loc.lng)),
+                    ymin: Math.min(...locations.map(loc => loc.lat)),
+                    xmax: Math.max(...locations.map(loc => loc.lng)),
+                    ymax: Math.max(...locations.map(loc => loc.lat)),
+                    spatialReference: { wkid: 4326 }
+                };
 
-                if (locations.length === 0) {
-                    document.getElementById('locationsPanel').innerHTML = '<p class="text-gray-500">No locations found.</p>';
-                    return;
-                }
-
-                // Add all locations to map and panel
-                locations.forEach(location => {
-                    addMarkerToMap(location);
-                    addLocationToPanel(location);
+                view.goTo({
+                    target: extent,
+                    padding: 50
                 });
-
-                // Zoom to show all locations if there are any
-                if (locations.length > 0) {
-                    const extent = {
-                        xmin: Math.min(...locations.map(loc => loc.lng)),
-                        ymin: Math.min(...locations.map(loc => loc.lat)),
-                        xmax: Math.max(...locations.map(loc => loc.lng)),
-                        ymax: Math.max(...locations.map(loc => loc.lat))
-                    };
-
-                    view.goTo({
-                        target: extent,
-                        padding: 50
-                    });
-                }
             }
+
         } catch (error) {
             console.error('Error loading locations:', error);
-            // Show error notification
+
             const notification = document.createElement('div');
             notification.className = 'bg-red-100 border-l-4 border-red-500 text-red-700 p-4';
             notification.innerHTML = '<p>Failed to load locations. Please try again later.</p>';
             document.getElementById('notification-container').appendChild(notification);
 
-            // Remove notification after 5 seconds
-            setTimeout(() => {
-                notification.remove();
-            }, 5000);
+            setTimeout(() => notification.remove(), 5000);
         } finally {
-            // Hide loading overlay
             document.getElementById('loading-overlay').classList.add('hidden');
         }
     }
+
+
 
     // When the view is ready, load the locations
     view.when(() => {
