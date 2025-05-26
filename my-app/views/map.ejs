@@ -1,17 +1,38 @@
-<%- include("layout", { title: "MapView" , body: ` <!-- 🗺️ ArcGIS Map Container -->
-    <div class="content-wrap p-4 max-w-screen-xl mx-auto w-full">
-        <!-- 🗺️ ArcGIS Map Container -->
-        <div id="mapViewDiv" class="h-[600px] mt-4 rounded border border-gray-300"></div>
+<%- include("layout", { title: "MapView" , body: ` <!-- Notification Container -->
+    <div id="notification-container" class="notification-container"></div>
 
-        <!-- 🔲 Dynamic Location Cards Panel (optional) -->
-        <div id="locationsPanel" class="mt-6 hidden flex-wrap gap-4">
-            <!-- Cards will be dynamically injected here -->
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p style="color: #374151; margin: 0;">Loading locations...</p>
+        </div>
+    </div>
+
+    <div class="content-wrap">
+        <h1 style="color: #1f2937; margin-bottom: 8px;">Location Markers Map</h1>
+        <p style="color: #6b7280; margin-bottom: 16px;">Interactive map showing database locations with markers</p>
+
+        <div class="controls">
+            <button id="loadLocationsBtn" class="btn">Load Locations</button>
+            <button id="clearMarkersBtn" class="btn">Clear Markers</button>
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span id="statusText">Ready to load locations</span>
+            </div>
         </div>
 
+        <!-- ArcGIS Map Container -->
+        <div id="mapViewDiv"></div>
     </div>
 
     <script>
-        const highlightId = "<%= highlightId %>";
+        // Pass server data to client if needed
+        const serverData = '<% - JSON.stringify(locals.initialData || {}) %>';  
+        console.log('Server data:', serverData);
+
+        // Then include all the ArcGIS JavaScript code from the artifact
     </script>
+
     `
     }) %>

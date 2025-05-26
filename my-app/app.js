@@ -64,9 +64,14 @@ app.get('/', (req, res) => {
 });
 
 app.get('/map', (req, res) => {
-    const highlightId = req.query.highlightId;
-    res.render('map', {highlightId, title: 'Map View', scripts: ['js/map.js'], styles: ['css/styles.css'] });
+    res.sendFile(path.join(__dirname, 'public', 'map.html'));
 });
+
+
+// app.get('/map', (req, res) => {
+//     const highlightId = req.query.highlightId;
+//     res.render('map', {highlightId, title: 'Map View', scripts: ['js/map.js'], styles: ['css/styles.css'] });
+// });
 
 app.get('/feasibility', (req, res) => {
     res.render('FishibleCheck', { title: 'CheckFeasibility', scripts: ['js/feasibility.js'], styles: ['css/feasibility.css'] });

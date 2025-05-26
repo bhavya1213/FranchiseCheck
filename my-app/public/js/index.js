@@ -551,7 +551,7 @@ async function fetchLocations() {
         const locations = await response.json();
         totalLocations = locations.length;
 
-        // Clear and repopulate existing locations array
+        // Clear and repopulate existing locations array WITH STATUS
         existingLocations.length = 0;
         locations.forEach(loc => {
             if (loc.lat && loc.lng) {
@@ -559,7 +559,7 @@ async function fetchLocations() {
                     id: loc.id,
                     lat: loc.lat,
                     lng: loc.lng,
-                    status: loc.status
+                    status: loc.status // Make sure to include status
                 });
             }
         });
@@ -620,6 +620,18 @@ function renderLocations(locations) {
       `).join('');
 }
 
+function hasCoordinatesChanged(locationId, newLat, newLng) {
+    const existingLocation = existingLocations.find(loc => loc.id === locationId);
+    if (!existingLocation) return true;
+
+    const latDiff = Math.abs(existingLocation.lat - newLat);
+    const lngDiff = Math.abs(existingLocation.lng - newLng);
+
+    // Consider coordinates changed if difference is more than 0.0001 degrees (~11 meters)
+    return latDiff > 0.0001 || lngDiff > 0.0001;
+}
+
+
 // Handle form submission
 async function handleFormSubmit(e) {
     e.preventDefault();
@@ -639,8 +651,7 @@ async function handleFormSubmit(e) {
             throw new Error('Failed to fetch distance threshold');
         }
         const distanceData = await response.json();
-        const selectedDistance = parseFloat(distanceData.mile) || 5; // Default to 5 miles if not found
-        const radiusMeters = selectedDistance * 1609.34;
+        const selectedDistance = parseFloat(distanceData.mile) || 5;
 
         // Check for valid coordinates
         if (isNaN(lat) || isNaN(lng)) {
@@ -656,18 +667,25 @@ async function handleFormSubmit(e) {
             }
         }
 
-        // Validate new location distance if it's not an update
-        if (!isUpdate) {
+        // Validate new location distance - only for new locations or when updating coordinates
+        if (!isUpdate || (isUpdate && hasCoordinatesChanged(locationId, lat, lng))) {
+            // Filter out current location if updating
+            const locationsToCheck = isUpdate
+                ? existingLocations.filter(loc => loc.id !== locationId)
+                : existingLocations;
+
             const isTooClose = validateNewLocation(
                 { lat, lng },
-                existingLocations,
+                locationsToCheck,
                 selectedDistance
             );
 
             if (isTooClose) {
-                status = "Rejected";
-                showNotification('error',
-                    'Location is within the restricted radius of another franchise and was automatically rejected');
+                if (status !== 'Rejected') {
+                    status = "Rejected";
+                    showNotification('warning',
+                        `Location is within ${selectedDistance} miles of an approved franchise and was automatically rejected`);
+                }
             }
         }
 
@@ -697,8 +715,10 @@ async function handleFormSubmit(e) {
         }
 
         const savedLocation = await saveResponse.json();
-        const action = isUpdate ? 'updated' : status === 'Rejected' ? 'added (auto-rejected)' : 'added';
-        showNotification('error', `Location ${action} successfully!`);
+        const action = isUpdate ? 'updated' : (status === 'Rejected') ? 'added (auto-rejected due to proximity)' : 'added';
+
+        const messageType = (status === 'Rejected' && !isUpdate) ? 'warning' : 'success';
+        showNotification(messageType, `Location ${action} successfully!`);
 
         resetForm();
         fetchLocations();
@@ -717,10 +737,13 @@ function validateNewLocation(newLocation, existingLocations, radiusMiles = 5) {
     const newLat = newLocation.lat;
     const newLng = newLocation.lng;
 
-    for (const loc of existingLocations) {
+    // Only check against APPROVED locations
+    const approvedLocations = existingLocations.filter(loc => loc.status === 'Approved');
+
+    for (const loc of approvedLocations) {
         const distance = calculateDistance(newLat, newLng, loc.lat, loc.lng);
         if (distance <= radiusMeters) {
-            return true;
+            return true; // Too close to an approved location
         }
     }
     return false;
@@ -744,7 +767,6 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
 function toRadians(degrees) {
     return degrees * (Math.PI / 180);
 }
-
 
 // Edit location
 async function editLocation(id) {
@@ -787,6 +809,44 @@ async function editLocation(id) {
         showLoading(false);
     }
 }
+
+function checkLocationConflicts() {
+    const approvedLocations = existingLocations.filter(loc => loc.status === 'Approved');
+    const conflicts = [];
+
+    // Fetch distance setting
+    fetch('/api/miles')
+        .then(response => response.json())
+        .then(data => {
+            const selectedDistance = parseFloat(data.mile) || 5;
+
+            for (let i = 0; i < approvedLocations.length; i++) {
+                for (let j = i + 1; j < approvedLocations.length; j++) {
+                    const loc1 = approvedLocations[i];
+                    const loc2 = approvedLocations[j];
+                    const distance = calculateDistance(loc1.lat, loc1.lng, loc2.lat, loc2.lng);
+                    const distanceInMiles = distance / 1609.34;
+
+                    if (distanceInMiles <= selectedDistance) {
+                        conflicts.push({
+                            location1: loc1,
+                            location2: loc2,
+                            distance: distanceInMiles.toFixed(2)
+                        });
+                    }
+                }
+            }
+
+            if (conflicts.length > 0) {
+                console.warn('Found conflicts between approved locations:', conflicts);
+                showNotification('warning',
+                    `Warning: Found ${conflicts.length} conflicts between approved locations. Check console for details.`);
+            } else {
+                showNotification('success', 'No conflicts found between approved locations.');
+            }
+        });
+}
+
 
 // Delete location
 async function deleteLocation(id) {

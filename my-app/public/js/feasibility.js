@@ -482,9 +482,28 @@ function displayResults(result, distanceThreshold) {
     const feasibilityDetails = document.getElementById('feasibility-details');
     const nearestDetails = document.getElementById('nearest-location-details');
 
+    // Helper function to extract city/state from address
+    function getCityState(address) {
+        if (!address) return 'Unknown Location';
+
+        // Split address by commas and get relevant parts
+        const parts = address.split(',').map(part => part.trim());
+
+        if (parts.length >= 2) {
+            // For international addresses, show last 2-3 parts (city, state/region, country)
+            if (parts.length >= 3) {
+                return `${parts[parts.length - 3]}, ${parts[parts.length - 2]}, ${parts[parts.length - 1]}`;
+            } else {
+                return `${parts[parts.length - 2]}, ${parts[parts.length - 1]}`;
+            }
+        }
+
+        return address; // Fallback to full address if parsing fails
+    }
+
     // Determine feasibility
     if (result.isFeasible) {
-        // Location is feasible (Now shows "Rejected" for feasible)
+        // Location is feasible
         feasibilityCard.className = 'border-l-4 border-green-500 bg-green-50 p-4 mb-4';
         feasibilityIcon.innerHTML = '<i class="fas fa-check-circle text-green-500 text-2xl"></i>';
         feasibilityStatus.textContent = 'Location is Feasible';
@@ -494,67 +513,77 @@ function displayResults(result, distanceThreshold) {
             <p class="text-gray-700">This location meets your minimum distance requirement of <strong>${distanceThreshold} miles</strong> from approved franchises.</p>
         `;
 
-        nearestDetails.innerHTML = `
-            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4">
-                <h4 class="text-yellow-600 font-semibold mb-2">
-                    <i class="fas fa-map-marker-alt text-yellow-500"></i> Nearest Franchise
-                </h4>
-                <p>No nearby franchises found.</p>
-            </div>
-        `;
+        // Show nearest approved location even when feasible
+        if (result.nearestApprovedLocation) {
+            const cityState = getCityState(result.nearestApprovedLocation.address);
+            nearestDetails.innerHTML = `
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4">
+                    <h4 class="text-blue-600 font-semibold mb-2">
+                        <i class="fas fa-map-marker-alt text-blue-500"></i> Nearest Approved Franchise
+                    </h4>
+                    <p><strong>Name:</strong> ${result.nearestApprovedLocation.name || 'Unknown'}</p>
+                    <p><strong>Location:</strong> ${cityState}</p>
+                    <p><strong>Distance:</strong> ${result.distanceToNearestApproved.toFixed(1)} miles</p>
+                    <p><strong>Status:</strong> <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Approved</span></p>
+                </div>
+            `;
+        } else {
+            nearestDetails.innerHTML = `
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4">
+                    <h4 class="text-blue-600 font-semibold mb-2">
+                        <i class="fas fa-map-marker-alt text-blue-500"></i> Nearest Approved Franchise
+                    </h4>
+                    <p>No approved franchises found in the system.</p>
+                </div>
+            `;
+        }
     } else {
-        // Location is not feasible (Now shows "Approved" for not feasible)
+        // Location is not feasible
         feasibilityCard.className = 'border-l-4 border-red-500 bg-red-50 p-4 mb-4';
         feasibilityIcon.innerHTML = '<i class="fas fa-times-circle text-red-500 text-2xl"></i>';
         feasibilityStatus.textContent = 'Location is Not Feasible';
         feasibilityStatus.className = 'text-lg font-semibold text-red-600';
 
-        // Approved franchise details (now shows as "Rejected")
+        // Approved franchise details
         let detailsHtml = `
-            <p class="text-gray-700">This location is too close to a rejected franchise (<strong>${result.distanceToNearestApproved.toFixed(1)} miles</strong> away).</p>
-            <p class="text-gray-700 font-medium mt-2">Minimum required distance is <strong>${distanceThreshold} miles</strong> from rejected franchises.</p>
+            <p class="text-gray-700">This location is too close to an approved franchise (<strong>${result.distanceToNearestApproved.toFixed(1)} miles</strong> away).</p>
+            <p class="text-gray-700 font-medium mt-2">Minimum required distance is <strong>${distanceThreshold} miles</strong> from approved franchises.</p>
         `;
 
         if (result.nearestApprovedLocation) {
+            const cityState = getCityState(result.nearestApprovedLocation.address);
             detailsHtml += `
                 <div class="mt-4 border-t pt-4">
-                    <h4 class="font-medium text-gray-800 mb-2">Nearest Rejected Franchise</h4>
+                    <h4 class="font-medium text-gray-800 mb-2">Conflicting Approved Franchise</h4>
                     <p><strong>Name:</strong> ${result.nearestApprovedLocation.name || 'Unknown'}</p>
-                    <p><strong>Address:</strong> ${result.nearestApprovedLocation.address || 'Unknown'}</p>
+                    <p><strong>Location:</strong> ${cityState}</p>
                     <p><strong>Distance:</strong> ${result.distanceToNearestApproved.toFixed(1)} miles</p>
-                    <p><strong>Status:</strong> <span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">Rejected</span></p>
+                    <p><strong>Status:</strong> <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Approved</span></p>
                 </div>
             `;
         }
 
         feasibilityDetails.innerHTML = detailsHtml;
 
-        // Nearest franchise details (now shows as "Approved")
-        if (!result.nearestApprovedLocation || result.nearestLocation.id !== result.nearestApprovedLocation.id) {
+        // Show other nearest franchise if different from the conflicting one
+        if (result.nearestLocation && (!result.nearestApprovedLocation || result.nearestLocation.id !== result.nearestApprovedLocation.id)) {
+            const cityState = getCityState(result.nearestLocation.address);
             nearestDetails.innerHTML = `
                 <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4">
                     <h4 class="text-yellow-600 font-semibold mb-2">
-                        <i class="fas fa-map-marker-alt text-yellow-500"></i> Nearest Franchise
+                        <i class="fas fa-map-marker-alt text-yellow-500"></i> Other Nearby Franchise
                     </h4>
                     <p><strong>Name:</strong> ${result.nearestLocation.name || 'Unknown'}</p>
-                    <p><strong>Address:</strong> ${result.nearestLocation.address || 'Unknown'}</p>
+                    <p><strong>Location:</strong> ${cityState}</p>
                     <p><strong>Distance:</strong> ${result.distanceToNearest.toFixed(1)} miles</p>
-                    <p><strong>Status:</strong> <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Approved</span></p>
+                    <p><strong>Status:</strong> <span class="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs">${result.nearestLocation.status || 'Unknown'}</span></p>
                 </div>
             `;
         } else {
-            nearestDetails.innerHTML = `
-                <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4">
-                    <h4 class="text-yellow-600 font-semibold mb-2">
-                        <i class="fas fa-map-marker-alt text-yellow-500"></i> Nearest Franchise
-                    </h4>
-                    <p>No nearby franchises found.</p>
-                </div>
-            `;
+            nearestDetails.innerHTML = ''; // Don't show duplicate information
         }
     }
 }
-
 
 
 // Helper function to get color class based on status
