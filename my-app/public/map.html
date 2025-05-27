@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="css/map.css">
     <script src="https://js.arcgis.com/4.28/"></script>
     <script src="https://js.arcgis.com/4.28/init.js"></script>
+    
 </head>
 
 <body class="bg-gray-100 min-h-screen flex flex-col">
@@ -59,12 +60,13 @@
             </div>
         </div>
     </nav>
+    <arcgis-locate position="top-left"></arcgis-locate>
 
     <!-- Main Content -->
     <div class="flex-grow">
 
         <!-- 🗺️ ArcGIS Map Container -->
-        <div id="mapViewDiv" class="w-full h-[calc(100vh-64px-80px)]"></div>
+        <div id="mapViewDiv" class="w-full h-[calc(100vh-47px-80px)]"></div>
 
         <!-- 🔲 Dynamic Location Cards Panel (optional) -->
         <div id="locationsPanel" class="mt-6 hidden flex-wrap gap-4">
@@ -72,7 +74,7 @@
         </div>
 
     </div>
-    
+
 
     <!-- Footer -->
     <footer class="bg-white rounded-lg shadow-sm dark:bg-gray-800 p-4">

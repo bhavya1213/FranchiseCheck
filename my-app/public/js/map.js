@@ -22,14 +22,9 @@ require([
     const view = new MapView({
         container: "mapViewDiv",
         map: map,
-        center: [-74.006, 40.7128], // New York City default
-        zoom: 10,
-        constraints: {
-            minZoom: 3,
-            maxZoom: 18,
-        },
+        center: [-74.006, 40.7128],
         ui: {
-            components: [] // Remove default UI components to add custom ones
+            components: []
         }
     });
 
@@ -40,10 +35,10 @@ require([
     map.add(markersLayer);
 
     // Create graphics layer for current location
-    const currentLocationLayer = new GraphicsLayer({
-        title: "Current Location"
-    });
-    map.add(currentLocationLayer);
+    // const currentLocationLayer = new GraphicsLayer({
+    //     title: "Current Location"
+    // });
+    // map.add(currentLocationLayer);
 
     // Add Search Widget
     const searchWidget = new Search({
@@ -56,41 +51,35 @@ require([
         index: 0
     });
 
-    // Add Home Widget
-    const homeWidget = new Home({
-        view: view
-    });
-    view.ui.add(homeWidget, "top-left");
-
-    // Add Zoom Widget
+    // Add Zoom and Home Widgets
     const zoomWidget = new Zoom({
         view: view
     });
-    view.ui.add(zoomWidget, "top-left");
+    const homeWidget = new Home({
+        view: view
+    });
+    view.ui.add([zoomWidget, homeWidget], "bottom-right");
 
-    // Add Locate Widget (Current Location)
     const locateWidget = new Locate({
         view: view,
-        graphic: new Graphic({
-            symbol: new SimpleMarkerSymbol({
-                style: "circle",
-                color: [0, 150, 255, 0.8],
-                size: "15px",
-                outline: {
-                    color: [255, 255, 255],
-                    width: 2
-                }
-            })
-        }),
-        scale: 3000 // Set zoom level when location is found
+        useHeadingEnabled: false, // optional
+        goToOverride: function (view, options) {
+            options.target.scale = 1500; // zoom in closer
+            return view.goTo(options.target);
+        }
     });
-    view.ui.add(locateWidget, "top-left");
+
+    // Add the Locate widget to the top-left corner of the view
+    view.ui.add(locateWidget, {
+        position: "bottom-right"
+    });
 
     // Add Scale Bar
     const scaleBar = new ScaleBar({
         view: view
     });
     view.ui.add(scaleBar, "bottom-left");
+
 
     // UI Elements (optional - for status display)
     const loadingOverlay = document.getElementById('loading-overlay');
@@ -131,7 +120,7 @@ require([
                     const currentLocationSymbol = new SimpleMarkerSymbol({
                         style: "circle",
                         color: [0, 150, 255, 0.8],
-                        size: "20px",
+                        size: "16px",
                         outline: {
                             color: [255, 255, 255],
                             width: 3
@@ -212,7 +201,7 @@ require([
     }
 
     // Utility functions - Enhanced notification system
-    function showNotification(type, message) {
+    function showNotification(message, type) {
         if (!notificationContainer) return;
 
         const notification = document.createElement('div');
@@ -264,10 +253,10 @@ require([
         return new SimpleMarkerSymbol({
             style: "circle",
             color: color,
-            size: "12px",
+            size: "16px",
             outline: {
                 color: [255, 255, 255],
-                width: 0.5
+                width: 2
             }
         });
     }
@@ -301,9 +290,11 @@ require([
         try {
             // Replace with your actual API endpoint
             const response = await fetch('/api/locations');
-
+            if (response.status === 404) {
+                throw new Error(response.statusText || "Not Found")
+            }
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
             }
 
             const locations = await response.json();
@@ -365,10 +356,10 @@ require([
             }
 
             updateStatus(`Loaded ${locations.length} locations`);
-            showNotification(`Successfully loaded ${locations.length} location markers`);
+            showNotification(`Markers loaded Successfully`);
 
         } catch (error) {
-            console.error('Error loading locations:', error);
+            console.log('Error loading locations:', error);
             updateStatus('Error loading locations');
             showNotification(`Failed to load locations: ${error.message}`, 'error');
         }
@@ -379,16 +370,16 @@ require([
     // Event Listeners
 
     // Listen for locate widget events
-    locateWidget.on("locate", function (event) {
-        console.log("Location found:", event);
-        updateStatus(`Location found with ${Math.round(event.position.coords.accuracy)}m accuracy`);
-    });
+    // locateWidget.on("locate", function (event) {
+    //     console.log("Location found:", event);
+    //     updateStatus(`Location found with ${Math.round(event.position.coords.accuracy)}m accuracy`);
+    // });
 
-    locateWidget.on("locate-error", function (event) {
-        console.error("Locate error:", event);
-        updateStatus("Could not find current location");
-        showNotification("Could not find current location", 'error');
-    });
+    // locateWidget.on("locate-error", function (event) {
+    //     console.error("Locate error:", event);
+    //     updateStatus("Could not find current location");
+    //     showNotification("Could not find current location", 'error');
+    // });
 
     // Listen for search widget events
     searchWidget.on("search-complete", function (event) {
@@ -428,7 +419,7 @@ require([
 
     // Optional: Refresh locations periodically (every 5 minutes)
     // Uncomment if you want automatic refresh
-    
+
     setInterval(() => {
         console.log('Refreshing locations...');
         loadLocations();

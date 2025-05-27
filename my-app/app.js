@@ -67,12 +67,6 @@ app.get('/map', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'map.html'));
 });
 
-
-// app.get('/map', (req, res) => {
-//     const highlightId = req.query.highlightId;
-//     res.render('map', {highlightId, title: 'Map View', scripts: ['js/map.js'], styles: ['css/styles.css'] });
-// });
-
 app.get('/feasibility', (req, res) => {
     res.render('FishibleCheck', { title: 'CheckFeasibility', scripts: ['js/feasibility.js'], styles: ['css/feasibility.css'] });
 });
@@ -98,8 +92,7 @@ app.get('/api/locations', async (req, res) => {
         const { rows } = await pool.query(query);
         res.json(rows);
     } catch (err) {
-        console.error('Error in /api/locations (GET):', err);
-        res.status(500).json({ error: 'Error fetching location data from the database in /api/locations (GET)' });
+        res.status(500).json({ error: 'Error fetching location' });
     }
 });
 

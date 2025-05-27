@@ -30,7 +30,7 @@ function initMap() {
 
                 // Create the view
                 view = new MapView({
-                    container: "location-map",
+                    container: "mapViewDiv",
                     map: map,
                     center: [0, 20], // longitude, latitude
                     zoom: 2,
@@ -283,6 +283,7 @@ function handleLocationSearch() {
                         target: point,
                         zoom: 15
                     });
+                    map.add(point);
                 });
 
                 showNotification('success', 'Location found and marked on map');
@@ -717,7 +718,7 @@ async function handleFormSubmit(e) {
         const savedLocation = await saveResponse.json();
         const action = isUpdate ? 'updated' : (status === 'Rejected') ? 'added (auto-rejected due to proximity)' : 'added';
 
-        const messageType = (status === 'Rejected' && !isUpdate) ? 'warning' : 'success';
+        const messageType = (status === 'Rejected' && !isUpdate) ? 'warning' : 'error';
         showNotification(messageType, `Location ${action} successfully!`);
 
         resetForm();
@@ -792,7 +793,14 @@ async function editLocation(id) {
                 latitude: location.lat
             });
             updateMapMarker(point);
-            view.goTo(point);
+            if (view) {
+                view.goTo({
+                    traget: point,
+                    zoom: 10,
+                });
+            } else {
+                console.warn('Map view not ready yet');
+            }
         });
 
         // Update UI for editing
