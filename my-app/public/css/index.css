@@ -59,3 +59,89 @@
 .esri-component {
     display: table-column;
 }
+
+mark {
+    background-color: #fef08a;
+    padding: 1px 2px;
+    border-radius: 2px;
+    font-weight: 500;
+}
+
+/* Search input animation */
+#search-input:focus {
+    transform: scale(1.02);
+    transition: transform 0.2s ease-in-out;
+}
+
+/* Quick search buttons animation */
+.quick-search-btn {
+    transition: all 0.2s ease-in-out;
+}
+
+.quick-search-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Table row hover effects */
+.locations-row {
+    transition: all 0.15s ease-in-out;
+}
+
+.locations-row:hover {
+    background-color: #f9fafb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Search options menu animation */
+#search-options-menu {
+    transition: all 0.2s ease-in-out;
+    opacity: 0;
+    transform: translateY(-10px);
+}
+
+#search-options-menu.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Status filter checkboxes */
+.status-filter:checked {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+}
+
+/* Loading animation for search */
+.search-loading {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 50%;
+    border-top-color: #3b82f6;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    #search-input {
+        width: 100%;
+        max-width: 240px;
+    }
+
+    .flex.justify-between.items-center.mb-4 {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .flex.items-center.space-x-3 {
+        justify-content: space-between;
+    }
+}

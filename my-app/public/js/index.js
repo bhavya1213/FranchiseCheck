@@ -223,6 +223,35 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         console.log("Search input or button not found. Make sure the elements exist in the DOM.");
     }
+
+    searchInput.addEventListener('input', handleSearchInput);
+
+    // Add search by Enter key
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            currentPage = 1;
+            fetchLocations();
+        }
+    });
+
+    // Add clear search button functionality
+    const clearSearchBtn = document.createElement('button');
+    clearSearchBtn.innerHTML = '<i class="fas fa-times"></i>';
+    clearSearchBtn.className = 'absolute right-3 top-3 text-gray-400 hover:text-gray-600 transition-colors';
+    clearSearchBtn.title = 'Clear search';
+    clearSearchBtn.onclick = clearSearch;
+    clearSearchBtn.style.display = 'none';
+
+    // Add clear button to search input container
+    const searchContainer = searchInput.parentNode;
+    searchContainer.classList.add('relative');
+    searchContainer.appendChild(clearSearchBtn);
+
+    // Show/hide clear button based on input
+    searchInput.addEventListener('input', () => {
+        clearSearchBtn.style.display = searchInput.value.trim() ? 'block' : 'none';
+    });
 });
 
 // Handle address input for suggestions
@@ -540,33 +569,44 @@ async function geocodeAddress() {
 
 
 // Fetch locations from API
+let allLocations = []; 
+let filteredLocations = []; 
+
+
 async function fetchLocations() {
     showLoading(true);
     try {
-        const searchTerm = searchInput.value.trim();
-        let url = `/api/locations`;
-
-        const response = await fetch(url);
+        const response = await fetch('/api/locations');
         if (!response.ok) throw new Error('Failed to fetch locations');
 
-        const locations = await response.json();
-        totalLocations = locations.length;
+        allLocations = await response.json();
+
+        // Apply search filter if there's a search term
+        const searchTerm = searchInput.value.trim().toLowerCase();
+        if (searchTerm) {
+            filteredLocations = filterLocations(allLocations, searchTerm);
+        } else {
+            filteredLocations = [...allLocations];
+        }
+
+        totalLocations = filteredLocations.length;
 
         // Clear and repopulate existing locations array WITH STATUS
         existingLocations.length = 0;
-        locations.forEach(loc => {
+        allLocations.forEach(loc => {
             if (loc.lat && loc.lng) {
                 existingLocations.push({
                     id: loc.id,
                     lat: loc.lat,
                     lng: loc.lng,
-                    status: loc.status // Make sure to include status
+                    status: loc.status
                 });
             }
         });
 
-        renderLocations(locations);
+        renderLocations(filteredLocations);
         updatePagination();
+        updateSearchResults(searchTerm, filteredLocations.length, allLocations.length);
     } catch (error) {
         showNotification('error', `Error fetching locations: ${error.message}`);
         console.error('Error:', error);
@@ -575,16 +615,95 @@ async function fetchLocations() {
     }
 }
 
+// Filter locations based on search term
+function filterLocations(locations, searchTerm) {
+    if (!searchTerm) return locations;
+
+    return locations.filter(location => {
+        const name = (location.name || '').toLowerCase();
+        const address = (location.address || '').toLowerCase();
+        const status = (location.status || '').toLowerCase();
+
+        return name.includes(searchTerm) ||
+            address.includes(searchTerm) ||
+            status.includes(searchTerm);
+    });
+}
+
+// Update search results display
+function updateSearchResults(searchTerm, filteredCount, totalCount) {
+    const searchResultsDiv = document.getElementById('search-results') || createSearchResultsDiv();
+
+    if (searchTerm) {
+        searchResultsDiv.innerHTML = `
+            <div class="bg-blue-50 border-l-4 border-blue-400 p-3 mb-4">
+                <div class="flex items-center">
+                    <i class="fas fa-search text-blue-400 mr-2"></i>
+                    <div class="text-sm">
+                        <span class="font-medium text-blue-800">Search Results:</span>
+                        <span class="text-blue-700">
+                            Found ${filteredCount} of ${totalCount} locations for "${searchTerm}"
+                        </span>
+                        ${filteredCount === 0 ?
+                '<div class="mt-1 text-blue-600">Try different keywords or check spelling</div>' :
+                ''
+            }
+                    </div>
+                    <button onclick="clearSearch()" class="ml-auto text-blue-600 hover:text-blue-800">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        searchResultsDiv.classList.remove('hidden');
+    } else {
+        searchResultsDiv.classList.add('hidden');
+    }
+}
+
+// Create search results div if it doesn't exist
+function createSearchResultsDiv() {
+    const searchResultsDiv = document.createElement('div');
+    searchResultsDiv.id = 'search-results';
+    searchResultsDiv.className = 'hidden';
+
+    // Insert before the table
+    const tableContainer = document.querySelector('.overflow-x-auto');
+    tableContainer.parentNode.insertBefore(searchResultsDiv, tableContainer);
+
+    return searchResultsDiv;
+}
+
+// Clear search function
+function clearSearch() {
+    searchInput.value = '';
+    currentPage = 1;
+    fetchLocations();
+}
+
 // Render locations in the table
 function renderLocations(locations) {
+    const searchTerm = searchInput.value.trim().toLowerCase();
+
     if (locations.length === 0) {
+        const noResultsMessage = searchTerm ?
+            `No locations found matching "${searchTerm}"` :
+            'No locations found. Add your first location!';
+
         locationsTableBody.innerHTML = `
-              <tr>
-                  <td colspan="4" class="px-6 py-4 text-center text-gray-500">
-                      No locations found. Add your first location!
-                  </td>
-              </tr>
-          `;
+            <tr>
+                <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                    <div class="flex flex-col items-center space-y-2">
+                        <i class="fas ${searchTerm ? 'fa-search' : 'fa-map-marker-alt'} text-gray-400 text-2xl"></i>
+                        <div>${noResultsMessage}</div>
+                        ${searchTerm ?
+                '<button onclick="clearSearch()" class="text-blue-600 hover:text-blue-800 text-sm">Clear search</button>' :
+                ''
+            }
+                    </div>
+                </td>
+            </tr>
+        `;
         return;
     }
 
@@ -593,32 +712,89 @@ function renderLocations(locations) {
     const paginatedLocations = locations.slice(startIdx, startIdx + itemsPerPage);
 
     locationsTableBody.innerHTML = paginatedLocations.map(location => `
-          <tr class="hover:bg-gray-50 cursor-pointer" data-id="${location.id}" onclick="showLocationDetails('${location.id}')">
+        <tr class="hover:bg-gray-50 cursor-pointer locations-row" data-id="${location.id}" onclick="showLocationDetails('${location.id}')">
             <td class="px-6 py-4 text-left">
-                <div class="font-medium text-gray-900">${location.name}</div>
+                <div class="font-medium text-gray-900">${highlightSearchTerm(location.name, searchTerm)}</div>
             </td>
             <td class="px-6 py-4 text-left">
-                <div class="text-gray-600 max-w-xs truncate mx-auto">${location.address}</div>
+                <div class="text-gray-600 max-w-xs truncate">${highlightSearchTerm(location.address, searchTerm)}</div>
             </td>
             <td class="px-6 py-4 text-center">
                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColorClass(location.status)}">
-                    ${location.status}
+                    ${highlightSearchTerm(location.status, searchTerm)}
                 </span>
             </td>
             <td class="px-6 py-4 text-center whitespace-nowrap">
                 <div class="flex justify-center space-x-3">
                     <button onclick="event.stopPropagation(); editLocation('${location.id}')" 
-                            class="text-blue-600 hover:text-blue-900">
+                            class="text-blue-600 hover:text-blue-900 transition-colors"
+                            title="Edit location">
                         <i class="fas fa-edit"></i>
                     </button>
                     <button onclick="event.stopPropagation(); deleteLocation('${location.id}')" 
-                            class="text-red-600 hover:text-red-900">
+                            class="text-red-600 hover:text-red-900 transition-colors"
+                            title="Delete location">
                         <i class="fas fa-trash"></i>
                     </button>
+                   
                 </div>
             </td>
         </tr>
-      `).join('');
+    `).join('');
+}
+
+// Highlight search terms in text
+function highlightSearchTerm(text, searchTerm) {
+    if (!searchTerm || !text) return text;
+
+    const regex = new RegExp(`(${escapeRegExp(searchTerm)})`, 'gi');
+    return text.replace(regex, '<mark class="bg-yellow-200 px-1 rounded">$1</mark>');
+}
+
+// Escape special regex characters
+function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// View location on map function
+function viewLocationOnMap(id) {
+    const location = allLocations.find(loc => loc.id === id);
+    if (location) {
+        const lat = parseFloat(location.lat);
+        const lng = parseFloat(location.lng);
+
+        // Update map marker and center view
+        require(["esri/geometry/Point"], function (Point) {
+            const point = new Point({
+                longitude: lng,
+                latitude: lat
+            });
+            updateMapMarker(point);
+            if (view) {
+                view.goTo({
+                    target: point,
+                    zoom: 15
+                });
+            }
+        });
+
+        // Scroll to map
+        document.getElementById('mapViewDiv').scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+        });
+
+        showNotification('success', `Showing ${location.name} on map`);
+    }
+}
+
+let searchTimeout;
+function handleSearchInput() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        currentPage = 1; // Reset to first page when searching
+        fetchLocations();
+    }, 300); // 300ms delay for better UX
 }
 
 function hasCoordinatesChanged(locationId, newLat, newLng) {
@@ -895,7 +1071,10 @@ function updatePagination() {
     const paginationInfo = document.getElementById('pagination-info');
     const paginationControls = document.getElementById('pagination-controls');
 
-    paginationInfo.textContent = `Showing ${Math.min((currentPage - 1) * itemsPerPage + 1, totalLocations)}-${Math.min(currentPage * itemsPerPage, totalLocations)} of ${totalLocations} locations`;
+    const searchTerm = searchInput.value.trim();
+    const resultType = searchTerm ? 'search results' : 'locations';
+
+    paginationInfo.textContent = `Showing ${Math.min((currentPage - 1) * itemsPerPage + 1, totalLocations)}-${Math.min(currentPage * itemsPerPage, totalLocations)} of ${totalLocations} ${resultType}`;
 
     paginationControls.innerHTML = '';
 
@@ -904,7 +1083,7 @@ function updatePagination() {
     // Previous button
     const prevBtn = document.createElement('button');
     prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
-    prevBtn.className = `px-3 py-1 rounded-md ${currentPage === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'}`;
+    prevBtn.className = `px-3 py-1 rounded-md transition-colors ${currentPage === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'}`;
     prevBtn.disabled = currentPage === 1;
     prevBtn.onclick = () => {
         if (currentPage > 1) {
@@ -914,7 +1093,7 @@ function updatePagination() {
     };
     paginationControls.appendChild(prevBtn);
 
-    // Page numbers
+    // Page numbers with ellipsis for large page counts
     const maxVisiblePages = 5;
     let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
     let endPage = startPage + maxVisiblePages - 1;
@@ -923,21 +1102,42 @@ function updatePagination() {
         startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
 
+    // Show first page and ellipsis if needed
+    if (startPage > 1) {
+        const firstPageBtn = createPageButton(1);
+        paginationControls.appendChild(firstPageBtn);
+
+        if (startPage > 2) {
+            const ellipsis = document.createElement('span');
+            ellipsis.textContent = '...';
+            ellipsis.className = 'px-3 py-1 text-gray-500';
+            paginationControls.appendChild(ellipsis);
+        }
+    }
+
+    // Page number buttons
     for (let i = startPage; i <= endPage; i++) {
-        const pageBtn = document.createElement('button');
-        pageBtn.textContent = i;
-        pageBtn.className = `mx-1 px-3 py-1 rounded-md ${i === currentPage ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'}`;
-        pageBtn.onclick = () => {
-            currentPage = i;
-            fetchLocations();
-        };
+        const pageBtn = createPageButton(i);
         paginationControls.appendChild(pageBtn);
+    }
+
+    // Show last page and ellipsis if needed
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            const ellipsis = document.createElement('span');
+            ellipsis.textContent = '...';
+            ellipsis.className = 'px-3 py-1 text-gray-500';
+            paginationControls.appendChild(ellipsis);
+        }
+
+        const lastPageBtn = createPageButton(totalPages);
+        paginationControls.appendChild(lastPageBtn);
     }
 
     // Next button
     const nextBtn = document.createElement('button');
     nextBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
-    nextBtn.className = `px-3 py-1 rounded-md ${currentPage === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'}`;
+    nextBtn.className = `px-3 py-1 rounded-md transition-colors ${currentPage === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'}`;
     nextBtn.disabled = currentPage === totalPages;
     nextBtn.onclick = () => {
         if (currentPage < totalPages) {
@@ -947,6 +1147,38 @@ function updatePagination() {
     };
     paginationControls.appendChild(nextBtn);
 }
+
+// Helper function to create page buttons
+function createPageButton(pageNumber) {
+    const pageBtn = document.createElement('button');
+    pageBtn.textContent = pageNumber;
+    pageBtn.className = `mx-1 px-3 py-1 rounded-md transition-colors ${pageNumber === currentPage ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'}`;
+    pageBtn.onclick = () => {
+        currentPage = pageNumber;
+        fetchLocations();
+    };
+    return pageBtn;
+}
+
+// Add keyboard shortcuts for search
+document.addEventListener('keydown', (e) => {
+    // Ctrl/Cmd + F to focus search
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        searchInput.focus();
+        searchInput.select();
+    }
+
+    // Escape to clear search when search input is focused
+    if (e.key === 'Escape' && document.activeElement === searchInput) {
+        clearSearch();
+        searchInput.blur();
+    }
+});
+
+// Export functions for global access
+window.clearSearch = clearSearch;
+window.viewLocationOnMap = viewLocationOnMap;
 
 // Show loading state
 function showLoading(show) {
@@ -1072,3 +1304,95 @@ locationPopup.addEventListener('click', (e) => {
         closeLocationPopup();
     }
 });
+
+/**************************************/ 
+
+// Additional JavaScript for enhanced search functionality 
+
+// Quick search function
+function quickSearch(term) {
+    document.getElementById('search-input').value = term;
+    currentPage = 1;
+    fetchLocations();
+}
+
+// Toggle search options menu
+document.getElementById('search-options-btn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    const menu = document.getElementById('search-options-menu');
+    menu.classList.toggle('hidden');
+    menu.classList.toggle('show');
+});
+
+// Close search options menu when clicking outside
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('search-options-menu');
+    const btn = document.getElementById('search-options-btn');
+    
+    if (!menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.classList.add('hidden');
+        menu.classList.remove('show');
+    }
+});
+
+// Handle status filter changes
+document.querySelectorAll('.status-filter').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+        if (this.value === 'all') {
+            // If "All" is checked, uncheck other filters
+            if (this.checked) {
+                document.querySelectorAll('.status-filter:not([value="all"])').forEach(cb => {
+                    cb.checked = false;
+                });
+            }
+        } else {
+            // If any specific status is checked, uncheck "All"
+            if (this.checked) {
+                document.querySelector('.status-filter[value="all"]').checked = false;
+            }
+        }
+        
+        // Apply filters
+        applyStatusFilters();
+    });
+});
+
+// Apply status filters
+function applyStatusFilters() {
+    const checkedFilters = Array.from(document.querySelectorAll('.status-filter:checked'))
+        .map(cb => cb.value)
+        .filter(value => value !== 'all');
+    
+    // If no specific filters are checked, show all
+    if (checkedFilters.length === 0) {
+        document.querySelector('.status-filter[value="all"]').checked = true;
+        currentPage = 1;
+        fetchLocations();
+        return;
+    }
+    
+    // Filter locations by status
+    const searchTerm = document.getElementById('search-input').value.trim().toLowerCase();
+    let filtered = allLocations;
+    
+    // Apply text search first
+    if (searchTerm) {
+        filtered = filterLocations(filtered, searchTerm);
+    }
+    
+    // Apply status filters
+    if (checkedFilters.length > 0) {
+        filtered = filtered.filter(location => 
+            checkedFilters.includes(location.status)
+        );
+    }
+    
+    filteredLocations = filtered;
+    totalLocations = filteredLocations.length;
+    currentPage = 1;
+    
+    renderLocations(filteredLocations);
+    updatePagination();
+    updateSearchResults(searchTerm, filteredLocations.length, allLocations.length);
+}
+
