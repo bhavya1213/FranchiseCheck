@@ -32,7 +32,7 @@ function initMap() {
                 view = new MapView({
                     container: "mapViewDiv",
                     map: map,
-                    center: [0, 20], // longitude, latitude
+                    center: [-98.5795, 39.8283],
                     zoom: 2,
                     ui: {
                         components: []
